@@ -139,3 +139,98 @@ impl ToRegValue for u64 {
         }
     }
 }
+
+/// A strongly-typed enumeration of [registry data types](https://msdn.microsoft.com/en-us/library/windows/desktop/bb773476(v=vs.85).aspx).
+///
+/// **NOTE:** There are several caveats to remember when dealing with string types in the Windows
+/// API:
+///
+/// 1. As with conversions to and from `RegValue`, conversions between UTF-8 (Rust
+///     representation) and WTF-16 happen when actually making API calls to the Windows operating
+///     system.
+/// 2. Null string pointers are indistinguishable from empty strings when stored as null-terminated
+///    strings. Both cases are deserialized as an empty string.
+/// 3. The `RegMultiSz` variant also is affected by the above caveat in the case of storing a
+///    single string. However, instead.
+///
+///    Some examples of what serialized data will deserialize as when using `RegMultiSz`:
+///
+///    TODO: Turn this into a tested code block!
+///    // These shouldn't be surprising.
+///    * `["data"]` => `["data"]`
+///    * `[]` => `[]`
+///    * `["", ""]` => `["", ""]`
+///    * `[""]` => `[]` // But here, empty string is indistinguishable from having no string at
+///    all.
+///
+/// XXX: `Option` doesn't feel appropriate to use here, but forcing users to check for empty
+/// strings sounds pretty annoying too. Thoughts to improve this?
+#[derive(Clone, Debug, PartialEq)]
+pub enum StronglyTypedRegistryData { // TODO: Come up with a better name
+    RegNone,
+    /// A normal string.
+    ///
+    /// Note that null-terminated storage caveats apply to this type -- see above.
+    RegSz(String),
+    /// A string that contains unexpanded references to environmental variables, i.e., `"%HOME%"`.
+    ///
+    /// Note that null-terminated storage caveats apply to this type -- see above.
+    RegExpandSz(String),
+    /// Simple binary data.
+    RegBinary(Vec<u8>),
+    /// A 32-bit integral that is stored as a little-endian integer.
+    RegDwordLittleEndian(u32),
+    /// A 32-bit integral that is stored as a big-endian integer.
+    RegDwordBigEndian(u32),
+    /// A symbolic link in the registry.
+    ///
+    /// Note that null-terminated storage caveats apply to this type -- see above.
+    RegLink(String),
+    /// An array of strings.
+    ///
+    /// Note that null-terminated storage caveats apply to this type -- see above.
+    RegMultiSz(Vec<String>),
+    /// Binary data representing a "resource list".
+    ///
+    /// The format of this type is unknown, and exposed as raw binary.
+    RegResourceList(Vec<u8>),
+    /// Binary data representing a "full resource descriptor".
+    ///
+    /// The format of this type is unknown, and exposed as raw binary.
+    RegFullResourceDescriptor(Vec<u8>),
+    /// Binary data representing a "resource requirements list".
+    ///
+    /// The format of this type is unknown, and exposed as raw binary.
+    RegResourceRequirementsList(Vec<u8>),
+    /// A 64-bit integral that is stored as a little-endian integer.
+    ///
+    /// There is no big-endian variant of this type.
+    RegQword(u64),
+}
+
+impl StronglyTypedRegistryData {
+    /// Retrieves the type discriminant defined by Windows for this type (see [here](https://msdn.microsoft.com/en-us/library/windows/desktop/ms724884(v=vs.85).aspx) for reference).
+    pub fn discriminant(&self) -> u32 {
+        use self::RegistryData::*;
+        match self {
+            &RegNone => REG_NONE,
+            &RegSz(_) => REG_SZ,
+            &RegExpandSz(_) => REG_EXPAND_SZ,
+            &RegBinary(_) => REG_BINARY,
+            &RegDwordLittleEndian(_) => REG_DWORD,
+            &RegDwordBigEndian(_) => REG_DWORD_BIG_ENDIAN,
+            &RegLink(_) => REG_LINK,
+            &RegMultiSz(_) => REG_MULTI_SZ,
+            &RegResourceList(_) => REG_RESOURCE_LIST,
+            &RegFullResourceDescriptor(_) => REG_FULL_RESOURCE_DESCRIPTOR,
+            &RegResourceRequirementsList(_) => REG_RESOURCE_REQUIREMENTS_LIST,
+            &RegQword(_) => REG_QWORD,
+        }
+    }
+}
+
+impl ToRegValue for StronglyTypedRegistryData {
+    fn from_reg_value(val: &RegValue) -> io::Result<Self> {
+        // TODO:
+    }
+}
