@@ -92,6 +92,7 @@
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", warn(option_unwrap_used))]
 #![cfg_attr(feature="clippy", warn(result_unwrap_used))]
+extern crate failure;
 extern crate winapi;
 #[cfg(feature = "serialization-serde")]
 extern crate serde;
@@ -144,7 +145,7 @@ pub struct RegKeyMetadata {
 }
 
 /// Raw registry value
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct RegValue {
     pub bytes: Vec<u8>,
     pub vtype: RegType,
@@ -443,7 +444,7 @@ impl RegKey {
         EnumValues{key: self, index: 0}
     }
 
-    /// Delete key.Key names are not case sensitive. 
+    /// Delete key.Key names are not case sensitive.
     /// Cannot delete if it has subkeys.
     /// Use `delete_subkey_all` for that.
     ///
@@ -479,7 +480,7 @@ impl RegKey {
                 0,
                 0,
                 t.handle,
-                ptr::null_mut(), 
+                ptr::null_mut(),
             ) as DWORD
         } {
             0 => Ok(()),
@@ -887,7 +888,7 @@ fn to_utf16<P: AsRef<OsStr>>(s: P) -> Vec<u16> {
     s.as_ref().encode_wide().chain(Some(0).into_iter()).collect()
 }
 
-fn v16_to_v8(v: &[u16]) -> Vec<u8> {
+fn v16_to_v8(v: Vec<u16>) -> Vec<u8> {
     unsafe {
         slice::from_raw_parts(v.as_ptr() as *const u8, v.len()*2).to_vec()
     }
